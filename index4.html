@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wave Making Resistance vs. Speed</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      padding: 20px;
+      background-color: #f8f9fa;
+    }
+    .container {
+      max-width: 800px;
+    }
+    #speedGraph {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center mb-4">Wave Making Resistance vs. Speed</h1>
+    <form id="shipForm" class="mb-4">
+      <div class="mb-3">
+        <label for="lwlInput" class="form-label">Length at Waterline (meters)</label>
+        <input type="number" class="form-control" id="lwlInput" placeholder="Enter length in meters" step="0.1" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Calculate Speeds</button>
+      <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+    </form>
+    <div id="speedGraph"></div>
+  </div>
+
+  <script>
+    // Constants
+    const g = 9.81; // Gravitational constant (m/s^2)
+    const knotsPerMs = 1.94384; // Conversion factor from m/s to knots
+
+    // Data sets
+    const froudeNumbers = [
+      0.2, 0.202, 0.204, 0.206, 0.208, 0.21, 0.212, 0.214, 0.216, 0.218, 0.22, 0.222, 0.224, 0.226, 0.228, 0.23,
+      0.232, 0.234, 0.236, 0.238, 0.24, 0.242, 0.244, 0.246, 0.248, 0.25, 0.252, 0.254, 0.256, 0.258, 0.26, 0.262,
+      0.264, 0.266, 0.268, 0.27, 0.272, 0.274, 0.276, 0.278, 0.28, 0.282, 0.284, 0.286, 0.288, 0.29, 0.292, 0.294,
+      0.296, 0.298, 0.3, 0.302, 0.304, 0.306, 0.308, 0.31, 0.312, 0.314, 0.316, 0.318, 0.32, 0.322, 0.324, 0.326,
+      0.328, 0.33, 0.332, 0.334, 0.336, 0.338, 0.34, 0.342, 0.344, 0.346, 0.348, 0.35, 0.352, 0.354, 0.356, 0.358,
+      0.36, 0.362, 0.364, 0.366, 0.368, 0.37, 0.372, 0.374, 0.376, 0.378, 0.38, 0.382, 0.384, 0.386, 0.388, 0.39,
+      0.392, 0.394, 0.396, 0.398, 0.4, 0.402, 0.404, 0.406, 0.408, 0.41, 0.412, 0.414, 0.416, 0.418, 0.42, 0.422,
+      0.424, 0.426, 0.428, 0.43, 0.432, 0.434, 0.436, 0.438, 0.44, 0.442, 0.444, 0.446, 0.448, 0.45, 0.452, 0.454,
+      0.456, 0.458, 0.46, 0.462, 0.464, 0.466, 0.468, 0.47
+    ];
+
+    const yValues = [
+      0.000032, 0.000735, 0.002064, 0.004049, 0.006719, 0.010104, 0.014233, 0.019135, 0.024841, 0.03138, 0.038781,
+      0.047016, 0.055825, 0.06489, 0.073895, 0.082522, 0.090452, 0.097368, 0.102953, 0.10689, 0.10886, 0.108652,
+      0.106486, 0.102686, 0.097576, 0.091482, 0.084729, 0.077642, 0.070545, 0.063763, 0.057622, 0.05257, 0.049549,
+      0.049624, 0.053635, 0.061521, 0.072993, 0.087767, 0.105553, 0.126065, 0.149017, 0.17396, 0.199809, 0.225317,
+      0.249238, 0.270327, 0.287608, 0.301197, 0.311482, 0.318852, 0.323694, 0.32639, 0.327218, 0.326343, 0.32393,
+      0.320142, 0.315141, 0.30909, 0.302153, 0.294493, 0.286272, 0.277655, 0.268816, 0.259927, 0.251162, 0.242696,
+      0.234677, 0.227152, 0.22014, 0.213664, 0.207743, 0.202399, 0.197652, 0.193523, 0.190034, 0.187204, 0.185054,
+      0.183606, 0.18288, 0.182897, 0.183677, 0.185242, 0.187613, 0.190809, 0.194853, 0.199764, 0.205564, 0.212273,
+      0.219912, 0.228502, 0.238064, 0.248618, 0.260186, 0.272787, 0.286444, 0.301176, 0.317005, 0.333951, 0.352035,
+      0.371278, 0.391701, 0.413299, 0.435973, 0.459594, 0.484038, 0.509179, 0.534889, 0.561045, 0.587518, 0.614184,
+      0.640915, 0.667587, 0.694074, 0.720248, 0.745985, 0.771157, 0.79564, 0.819307, 0.842031, 0.863688, 0.884151,
+      0.903299, 0.92104, 0.937284, 0.951942, 0.964928, 0.976152, 0.985526, 0.992961, 0.998371, 1.001665, 1.002756,
+      1.001556, 0.997976, 0.991928, 0.983324
+    ];
+
+    // Linear interpolation function
+    function interpolate(x, x0, x1, y0, y1) {
+      return y0 + (x - x0) * (y1 - y0) / (x1 - x0);
+    }
+
+    // Form submission handler
+    document.getElementById('shipForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const lwl = parseFloat(document.getElementById('lwlInput').value);
+
+      if (isNaN(lwl) || lwl <= 0) {
+        alert('Please enter a valid positive number for waterline length.');
+        return;
+      }
+
+      // Calculate speeds for specific Froude numbers
+      const specificFroudeNumbers = [0.2, 0.241, 0.266, 0.301, 0.357, 0.461, 0.222, 0.254, 0.284, 0.328, 0.418];
+      const speedsMs = specificFroudeNumbers.map(fn => fn * Math.sqrt(g * lwl));
+      const speedsKnots = speedsMs.map(speed => Math.ceil(speed * knotsPerMs * 10) / 10); // Round up to 0.1 knot
+
+      // Find corresponding y-values for specific Froude numbers with interpolation
+      const specificYValues = specificFroudeNumbers.map(fn => {
+        let index = froudeNumbers.findIndex(f => f >= fn);
+        if (index === -1) index = froudeNumbers.length - 1;
+        if (index === 0) return yValues[0];
+        if (Math.abs(froudeNumbers[index] - fn) < 0.001) return yValues[index];
+        const x0 = froudeNumbers[index - 1];
+        const x1 = froudeNumbers[index];
+        const y0 = yValues[index - 1];
+        const y1 = yValues[index];
+        return interpolate(fn, x0, x1, y0, y1);
+      });
+
+      // Base curve trace
+      const baseTrace = {
+        x: froudeNumbers,
+        y: yValues,
+        mode: 'lines',
+        showlegend: false,
+        line: { color: 'blue' }
+      };
+
+      // Split markers into top, bottom, and orange groups
+      const topFroudeNumbers = [0.241, 0.301, 0.461];
+      const bottomFroudeNumbers = [0.2, 0.266, 0.357];
+      const orangeFroudeNumbers = [0.222, 0.254, 0.284, 0.328, 0.418];
+
+      // Top trace (0.241, 0.301, 0.461)
+      const topData = specificFroudeNumbers.map((fn, i) => topFroudeNumbers.includes(fn) ? { x: fn, y: specificYValues[i], text: `Fn: ${fn.toFixed(3)}<br>${speedsKnots[i]} knots` } : null).filter(d => d);
+      const topTrace = {
+        x: topData.map(d => d.x),
+        y: topData.map(d => d.y),
+        mode: 'markers+text',
+        showlegend: false,
+        marker: { size: 10, color: 'red' },
+        text: topData.map(d => d.text),
+        textposition: 'top center',
+        textfont: { size: 10 }
+      };
+
+      // Bottom trace (0.2, 0.266, 0.357) with green color
+      const bottomData = specificFroudeNumbers.map((fn, i) => bottomFroudeNumbers.includes(fn) ? { x: fn, y: specificYValues[i], text: `Fn: ${fn.toFixed(3)}<br>${speedsKnots[i]} knots` } : null).filter(d => d);
+      const bottomTrace = {
+        x: bottomData.map(d => d.x),
+        y: bottomData.map(d => d.y),
+        mode: 'markers+text',
+        showlegend: false,
+        marker: { size: 10, color: 'green' },
+        text: bottomData.map(d => d.text),
+        textposition: 'bottom center',
+        textfont: { size: 10 }
+      };
+
+      // Orange trace (0.222, 0.254, 0.284, 0.328, 0.418)
+      const orangeData = specificFroudeNumbers.map((fn, i) => orangeFroudeNumbers.includes(fn) ? { x: fn, y: specificYValues[i], text: `Fn: ${fn.toFixed(3)}<br>${speedsKnots[i]} knots` } : null).filter(d => d);
+      const orangeTrace = {
+        x: orangeData.map(d => d.x),
+        y: orangeData.map(d => d.y),
+        mode: 'markers+text',
+        showlegend: false,
+        marker: { size: 10, color: 'orange' },
+        text: orangeData.map(d => d.text),
+        textposition: 'top center',
+        textfont: { size: 10 }
+      };
+
+      const layout = {
+        title: 'Wave Making Resistance vs. Speed',
+        xaxis: { title: 'Froude Number', range: [0.19, 0.48] },
+        yaxis: { title: 'Wave Making Resistance', range: [-0.1, 1.1] },
+        margin: { t: 50, b: 50 }
+      };
+
+      Plotly.newPlot('speedGraph', [baseTrace, topTrace, bottomTrace, orangeTrace], layout);
+    });
+
+    // Reset button handler
+    document.getElementById('resetBtn').addEventListener('click', function () {
+      document.getElementById('shipForm').reset();
+      Plotly.purge('speedGraph');
+    });
+  </script>
+</body>
+</html>
